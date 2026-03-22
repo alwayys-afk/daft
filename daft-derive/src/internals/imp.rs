@@ -1151,10 +1151,7 @@ impl OwnedDiffFields {
             }
         };
 
-        // Skip serializing unchanged fields (None values).
-        f.attrs = vec![
-            parse_quote! { #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))] },
-        ];
+        f.attrs = vec![];
 
         Some((f, config))
     }

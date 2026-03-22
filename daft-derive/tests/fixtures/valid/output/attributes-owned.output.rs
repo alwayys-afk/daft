@@ -1,13 +1,8 @@
 struct WithAttrsOwnedDiffOwned {
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     a: Option<<i32 as ::daft::DiffableOwned>::DiffOwned>,
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     b: Option<<BTreeMap<Uuid, BTreeSet<usize>> as ::daft::DiffableOwned>::DiffOwned>,
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     d: Option<::daft::Leaf<Lazy>>,
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     e: Option<::daft::Leaf<usize>>,
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     f: Option<<usize as ::daft::DiffableOwned>::DiffOwned>,
 }
 impl ::core::fmt::Debug for WithAttrsOwnedDiffOwned
@@ -94,9 +89,7 @@ impl ::daft::DiffableOwned for WithAttrsOwned {
     }
 }
 struct LazyDiffOwned {
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     x: Option<<usize as ::daft::DiffableOwned>::DiffOwned>,
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     y: Option<<usize as ::daft::DiffableOwned>::DiffOwned>,
 }
 impl ::core::fmt::Debug for LazyDiffOwned

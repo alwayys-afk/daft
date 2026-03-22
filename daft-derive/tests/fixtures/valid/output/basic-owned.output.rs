@@ -1,7 +1,5 @@
 struct BasicOwnedDiffOwned {
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     a: Option<<i32 as ::daft::DiffableOwned>::DiffOwned>,
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     b: Option<<BTreeMap<Uuid, BTreeSet<usize>> as ::daft::DiffableOwned>::DiffOwned>,
 }
 impl ::core::fmt::Debug for BasicOwnedDiffOwned
