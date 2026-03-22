@@ -1,6 +1,6 @@
 //! Implementations for types from the `alloc` crate.
 
-use crate::{Diffable, Leaf};
+use crate::{Diffable, DiffableOwned, Leaf};
 use alloc::{
     borrow::{Cow, ToOwned},
     boxed::Box,
@@ -13,6 +13,14 @@ use alloc::{
 
 leaf_deref! { String => str }
 
+impl DiffableOwned for String {
+    type DiffOwned = Leaf<String>;
+
+    fn diff_owned(self, other: Self) -> Self::DiffOwned {
+        Leaf { before: self, after: other }
+    }
+}
+
 impl<T: Diffable + ?Sized> Diffable for Box<T> {
     type Diff<'daft>
         = <T as Diffable>::Diff<'daft>
@@ -21,6 +29,14 @@ impl<T: Diffable + ?Sized> Diffable for Box<T> {
 
     fn diff<'daft>(&'daft self, other: &'daft Self) -> Self::Diff<'daft> {
         (**self).diff(other)
+    }
+}
+
+impl<T: DiffableOwned> DiffableOwned for Box<T> {
+    type DiffOwned = T::DiffOwned;
+
+    fn diff_owned(self, other: Self) -> Self::DiffOwned {
+        (*self).diff_owned(*other)
     }
 }
 
@@ -35,6 +51,17 @@ impl<T: Diffable + ToOwned + ?Sized> Diffable for Cow<'_, T> {
     }
 }
 
+impl<T: ToOwned + ?Sized> DiffableOwned for Cow<'_, T>
+where
+    T::Owned: DiffableOwned,
+{
+    type DiffOwned = <T::Owned as DiffableOwned>::DiffOwned;
+
+    fn diff_owned(self, other: Self) -> Self::DiffOwned {
+        self.into_owned().diff_owned(other.into_owned())
+    }
+}
+
 impl<T: Diffable + ?Sized> Diffable for Arc<T> {
     type Diff<'daft>
         = <T as Diffable>::Diff<'daft>
@@ -46,6 +73,14 @@ impl<T: Diffable + ?Sized> Diffable for Arc<T> {
     }
 }
 
+impl<T: DiffableOwned + Clone> DiffableOwned for Arc<T> {
+    type DiffOwned = T::DiffOwned;
+
+    fn diff_owned(self, other: Self) -> Self::DiffOwned {
+        Arc::unwrap_or_clone(self).diff_owned(Arc::unwrap_or_clone(other))
+    }
+}
+
 impl<T: Diffable + ?Sized> Diffable for Rc<T> {
     type Diff<'daft>
         = <T as Diffable>::Diff<'daft>
@@ -54,6 +89,14 @@ impl<T: Diffable + ?Sized> Diffable for Rc<T> {
 
     fn diff<'daft>(&'daft self, other: &'daft Self) -> Self::Diff<'daft> {
         (**self).diff(other)
+    }
+}
+
+impl<T: DiffableOwned + Clone> DiffableOwned for Rc<T> {
+    type DiffOwned = T::DiffOwned;
+
+    fn diff_owned(self, other: Self) -> Self::DiffOwned {
+        Rc::unwrap_or_clone(self).diff_owned(Rc::unwrap_or_clone(other))
     }
 }
 
@@ -144,6 +187,19 @@ set_diff!(
     BTreeSet, Ord
 );
 
+map_diff_owned!(
+    /// An owned diff of two [`BTreeMap`] instances.
+    ///
+    /// Like [`BTreeMapDiff`], but with owned keys and values.
+    BTreeMap, Ord
+);
+set_diff_owned!(
+    /// An owned diff of two [`BTreeSet`] instances.
+    ///
+    /// Like [`BTreeSetDiff`], but with owned keys.
+    BTreeSet, Ord
+);
+
 /// Treat Vecs as Leafs
 //
 // We plan to add opt in diff functionality: set-like, reordered, etc...
@@ -154,6 +210,14 @@ impl<T: Diffable> Diffable for Vec<T> {
         T: 'daft;
 
     fn diff<'daft>(&'daft self, other: &'daft Self) -> Self::Diff<'daft> {
+        Leaf { before: self, after: other }
+    }
+}
+
+impl<T> DiffableOwned for Vec<T> {
+    type DiffOwned = Leaf<Vec<T>>;
+
+    fn diff_owned(self, other: Self) -> Self::DiffOwned {
         Leaf { before: self, after: other }
     }
 }

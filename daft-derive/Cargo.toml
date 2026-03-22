@@ -22,7 +22,8 @@ quote.workspace = true
 syn = { workspace = true, features = ["full", "visit"] }
 
 [dev-dependencies]
-daft = { workspace = true, features = ["derive"] }
+daft = { workspace = true, features = ["derive", "serde"] }
+serde_json = { workspace = true }
 datatest-stable.workspace = true
 expectorate.workspace = true
 prettyplease.workspace = true

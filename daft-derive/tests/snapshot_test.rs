@@ -48,43 +48,57 @@ fn run_derive_macro(
     data: &syn::File,
 ) -> impl Iterator<Item = internals::DeriveDiffableOutput> + '_ {
     // Look for structs and enums in the input -- give them to the derive macro.
-    let items = data.items.iter().filter_map(|item| match item {
-        syn::Item::Struct(item) => {
-            has_derive_diffable(&item.attrs).then(|| item.to_token_stream())
-        }
-        syn::Item::Enum(item) => {
-            has_derive_diffable(&item.attrs).then(|| item.to_token_stream())
-        }
-        syn::Item::Union(item) => {
-            has_derive_diffable(&item.attrs).then(|| item.to_token_stream())
-        }
-        _ => None,
-    });
+    data.items.iter().flat_map(|item| {
+        let (attrs, tokens) = match item {
+            syn::Item::Struct(item) => Some((&item.attrs, item.to_token_stream())),
+            syn::Item::Enum(item) => Some((&item.attrs, item.to_token_stream())),
+            syn::Item::Union(item) => Some((&item.attrs, item.to_token_stream())),
+            _ => None,
+        }?;
 
-    // Turn each item into a `syn::DeriveInput` and run the derive macro on it.
-    items.enumerate().map(|(i, item)| {
-        let data = syn::parse2::<DeriveInput>(item).unwrap_or_else(|err| {
-            panic!("failed to parse item {i}: {err}");
-        });
-        internals::derive_diffable(data)
+        let has_diffable = has_derive_attr(attrs, "Diffable");
+        let has_owned = has_derive_attr(attrs, "DiffableOwned");
+
+        if !has_diffable && !has_owned {
+            return None;
+        }
+
+        Some(
+            [has_diffable, has_owned]
+                .into_iter()
+                .zip([
+                    internals::derive_diffable as fn(DeriveInput) -> _,
+                    internals::derive_diffable_owned,
+                ])
+                .filter_map(move |(enabled, derive_fn)| {
+                    if !enabled {
+                        return None;
+                    }
+                    let data = syn::parse2::<DeriveInput>(tokens.clone())
+                        .expect("failed to parse item");
+                    Some(derive_fn(data))
+                })
+                .collect::<Vec<_>>(),
+        )
     })
+    .flatten()
 }
 
-fn has_derive_diffable(attrs: &[syn::Attribute]) -> bool {
+fn has_derive_attr(attrs: &[syn::Attribute], name: &str) -> bool {
     attrs.iter().any(|attr| {
         if !attr.path().is_ident("derive") {
             return false;
         }
 
-        let mut is_diffable = false;
+        let mut found = false;
         attr.parse_nested_meta(|meta| {
-            if meta.path.is_ident("Diffable") {
-                is_diffable = true;
+            if meta.path.is_ident(name) {
+                found = true;
             }
             Ok(())
         })
         .expect("derive attributes parsed correctly");
-        is_diffable
+        found
     })
 }
 

@@ -1,6 +1,6 @@
 //! Implementations for core types.
 
-use crate::{Diffable, Leaf};
+use crate::{Diffable, DiffableOwned, Leaf};
 use core::{
     cell::RefCell,
     marker::PhantomData,
@@ -16,6 +16,9 @@ leaf! { i64, i32, i16, i8, u64, u32, u16, u8, char, bool, isize, usize, NonZeroU
 leaf! { IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6 }
 leaf! { str }
 
+leaf_owned! { i64, i32, i16, i8, u64, u32, u16, u8, char, bool, isize, usize, NonZeroU8, NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128, NonZeroI8, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI128, NonZeroIsize, NonZeroUsize, () }
+leaf_owned! { IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6 }
+
 impl<T> Diffable for Option<T> {
     type Diff<'daft>
         = Leaf<Option<&'daft T>>
@@ -27,6 +30,14 @@ impl<T> Diffable for Option<T> {
     }
 }
 
+impl<T> DiffableOwned for Option<T> {
+    type DiffOwned = Leaf<Option<T>>;
+
+    fn diff_owned(self, other: Self) -> Self::DiffOwned {
+        Leaf { before: self, after: other }
+    }
+}
+
 impl<T, U> Diffable for Result<T, U> {
     type Diff<'daft>
         = Leaf<Result<&'daft T, &'daft U>>
@@ -35,6 +46,14 @@ impl<T, U> Diffable for Result<T, U> {
         U: 'daft;
     fn diff<'daft>(&'daft self, other: &'daft Self) -> Self::Diff<'daft> {
         Leaf { before: self.as_ref(), after: other.as_ref() }
+    }
+}
+
+impl<T, U> DiffableOwned for Result<T, U> {
+    type DiffOwned = Leaf<Result<T, U>>;
+
+    fn diff_owned(self, other: Self) -> Self::DiffOwned {
+        Leaf { before: self, after: other }
     }
 }
 
@@ -69,6 +88,14 @@ impl<T: ?Sized> Diffable for RefCell<T> {
     }
 }
 
+impl<T> DiffableOwned for RefCell<T> {
+    type DiffOwned = Leaf<RefCell<T>>;
+
+    fn diff_owned(self, other: Self) -> Self::DiffOwned {
+        Leaf { before: self, after: other }
+    }
+}
+
 impl<T: ?Sized> Diffable for PhantomData<T> {
     type Diff<'daft>
         = Leaf<&'daft PhantomData<T>>
@@ -76,6 +103,14 @@ impl<T: ?Sized> Diffable for PhantomData<T> {
         Self: 'daft;
 
     fn diff<'daft>(&'daft self, other: &'daft Self) -> Self::Diff<'daft> {
+        Leaf { before: self, after: other }
+    }
+}
+
+impl<T: ?Sized> DiffableOwned for PhantomData<T> {
+    type DiffOwned = Leaf<PhantomData<T>>;
+
+    fn diff_owned(self, other: Self) -> Self::DiffOwned {
         Leaf { before: self, after: other }
     }
 }
@@ -109,6 +144,33 @@ macro_rules! tuple_diffable {
 }
 
 tuple_diffable! {
+    (A 0),
+    (A 0, B 1),
+    (A 0, B 1, C 2),
+    (A 0, B 1, C 2, D 3),
+    (A 0, B 1, C 2, D 3, E 4),
+    (A 0, B 1, C 2, D 3, E 4, F 5),
+    (A 0, B 1, C 2, D 3, E 4, F 5, G 6),
+    (A 0, B 1, C 2, D 3, E 4, F 5, G 6, H 7),
+    (A 0, B 1, C 2, D 3, E 4, F 5, G 6, H 7, I 8),
+    (A 0, B 1, C 2, D 3, E 4, F 5, G 6, H 7, I 8, J 9)
+}
+
+macro_rules! tuple_diffable_owned {
+    ($(($($name:ident $ix:tt),+)),+) => {
+        $(
+            impl<$($name: DiffableOwned),+> DiffableOwned for ($($name,)+) {
+                type DiffOwned = ($($name::DiffOwned,)+);
+
+                fn diff_owned(self, other: Self) -> Self::DiffOwned {
+                    ($(self.$ix.diff_owned(other.$ix),)+)
+                }
+            }
+        )+
+    }
+}
+
+tuple_diffable_owned! {
     (A 0),
     (A 0, B 1),
     (A 0, B 1, C 2),

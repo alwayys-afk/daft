@@ -520,6 +520,21 @@ pub use alloc_impls::*;
 /// For more information, see the [crate-level documentation](crate).
 #[cfg(feature = "derive")]
 pub use daft_derive::Diffable;
+
+/// Derive macro for the [`DiffableOwned`] trait.
+///
+/// The behavior of this macro varies by type:
+///
+/// - For **structs**, this macro generates a corresponding recursive (eager)
+///   owned diff type by default. A non-recursive (lazy) diff can be generated
+///   by annotating the struct overall with `#[daft(leaf)]`.
+/// - For **enums** and **unions**, this macro generates a non-recursive (lazy)
+///   owned diff.
+///
+/// The generated diff types have no lifetime parameter and own all their data,
+/// making them suitable for serialization.
+#[cfg(feature = "derive")]
+pub use daft_derive::DiffableOwned;
 pub use diffable::*;
 pub use leaf::*;
 #[cfg(feature = "std")]

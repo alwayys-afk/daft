@@ -19,3 +19,11 @@ pub fn derive_diffable(
     let input = parse_macro_input!(input as syn::DeriveInput);
     internals::derive_diffable(input).into_token_stream().into()
 }
+
+#[proc_macro_derive(DiffableOwned, attributes(daft))]
+pub fn derive_diffable_owned(
+    input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let input = parse_macro_input!(input as syn::DeriveInput);
+    internals::derive_diffable_owned(input).into_token_stream().into()
+}

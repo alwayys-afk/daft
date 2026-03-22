@@ -1,4 +1,4 @@
-use crate::Diffable;
+use crate::{Diffable, DiffableOwned};
 use core::ops::{Deref, DerefMut};
 
 /// A primitive or atomic change.
@@ -7,6 +7,7 @@ use core::ops::{Deref, DerefMut};
 ///
 /// For more information, see the [crate-level documentation](crate).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Leaf<T> {
     /// The value on the before side.
     pub before: T,
@@ -224,5 +225,16 @@ impl<T> Leaf<&T> {
         T: Copy,
     {
         Leaf { before: *self.before, after: *self.after }
+    }
+}
+
+impl<T: DiffableOwned> Leaf<T> {
+    /// Perform an owned diff on [`before`][Self::before] and
+    /// [`after`][Self::after], returning `T::DiffOwned`.
+    ///
+    /// This is the owned equivalent of [`Leaf::diff_pair`].
+    #[inline]
+    pub fn diff_pair_owned(self) -> T::DiffOwned {
+        self.before.diff_owned(self.after)
     }
 }

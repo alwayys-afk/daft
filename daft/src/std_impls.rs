@@ -1,6 +1,6 @@
 //! Implementations for types in std.
 
-use crate::Diffable;
+use crate::{Diffable, DiffableOwned, Leaf};
 use std::{
     collections::{HashMap, HashSet},
     ffi::{OsStr, OsString},
@@ -10,6 +10,22 @@ use std::{
 
 leaf! { Path, OsStr }
 leaf_deref! { PathBuf => Path, OsString => OsStr }
+
+impl DiffableOwned for PathBuf {
+    type DiffOwned = Leaf<PathBuf>;
+
+    fn diff_owned(self, other: Self) -> Self::DiffOwned {
+        Leaf { before: self, after: other }
+    }
+}
+
+impl DiffableOwned for OsString {
+    type DiffOwned = Leaf<OsString>;
+
+    fn diff_owned(self, other: Self) -> Self::DiffOwned {
+        Leaf { before: self, after: other }
+    }
+}
 
 map_diff!(
     /// A diff of two [`HashMap`] instances.
@@ -97,6 +113,19 @@ set_diff!(
     /// assert_eq!(changes, expected);
     /// # }
     /// ```
+    HashSet, Hash
+);
+
+map_diff_owned!(
+    /// An owned diff of two [`HashMap`] instances.
+    ///
+    /// Like [`HashMapDiff`], but with owned keys and values.
+    HashMap, Hash
+);
+set_diff_owned!(
+    /// An owned diff of two [`HashSet`] instances.
+    ///
+    /// Like [`HashSetDiff`], but with owned keys.
     HashSet, Hash
 );
 

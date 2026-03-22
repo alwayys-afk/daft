@@ -13,7 +13,7 @@ license = "MIT OR Apache-2.0"
 keywords = ["diff", "difference", "semantic-diff", "structural-diff"]
 
 [workspace.lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ["cfg(doc_cfg)"] }
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(doc_cfg)", "cfg(feature, values(\"serde\"))"] }
 
 [workspace.dependencies]
 datatest-stable = "0.3.2"
@@ -32,4 +32,6 @@ proc-macro2 = "1.0"
 quote = "1.0"
 syn = "2.0"
 trybuild = "1.0.103"
+serde = { version = "1", default-features = false, features = ["derive"] }
+serde_json = "1"
 uuid = "1.12.0"

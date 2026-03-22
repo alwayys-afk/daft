@@ -1,4 +1,5 @@
 leaf! { uuid::Uuid }
+leaf_owned! { uuid::Uuid }
 
 #[cfg(test)]
 #[cfg(feature = "alloc")]

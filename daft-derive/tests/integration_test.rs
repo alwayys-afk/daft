@@ -1,4 +1,4 @@
-use daft::{Diffable, Leaf};
+use daft::{Diffable, DiffableOwned, Leaf};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Debug,
@@ -196,4 +196,266 @@ fn diff_pair_lifetimes() {
 
     assert_eq!(owned.before, "hello");
     assert_eq!(owned.after, "world");
+}
+
+// ---------------------------------------------------------------------------
+// DiffableOwned tests
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Eq, PartialEq, DiffableOwned)]
+enum OwnedEnum {
+    A,
+    B,
+    C(u32),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, DiffableOwned)]
+struct OwnedSimple {
+    a: i32,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, DiffableOwned)]
+struct OwnedLarge {
+    a: i32,
+    b: OwnedEnum,
+    c: BTreeMap<String, BTreeSet<usize>>,
+    d: OwnedSimple,
+}
+
+#[derive(Debug, Eq, PartialEq, DiffableOwned)]
+struct OwnedTupleStruct(String);
+
+#[test]
+fn test_owned_basic() {
+    // Enum: produces Leaf<Self>
+    let diff = OwnedEnum::A.diff_owned(OwnedEnum::B);
+    assert_eq!(diff, Leaf { before: OwnedEnum::A, after: OwnedEnum::B });
+
+    // Struct: produces recursive owned diff
+    let diff = OwnedSimple { a: 0 }.diff_owned(OwnedSimple { a: 1 });
+    assert_eq!(diff, OwnedSimpleDiffOwned { a: Leaf { before: 0, after: 1 } });
+
+    // Tuple struct
+    let diff = OwnedTupleStruct("hello".into())
+        .diff_owned(OwnedTupleStruct("world".into()));
+    assert_eq!(
+        diff.0,
+        Leaf { before: "hello".to_owned(), after: "world".to_owned() }
+    );
+}
+
+#[test]
+fn test_owned_complex() {
+    let c1: BTreeMap<String, BTreeSet<usize>> =
+        [("key".into(), [1, 2, 3].into_iter().collect())]
+            .into_iter()
+            .collect();
+    let mut c2 = c1.clone();
+    c2.get_mut("key").unwrap().remove(&2);
+    c2.get_mut("key").unwrap().insert(4);
+    c2.insert("new".into(), [9].into_iter().collect());
+
+    let a = OwnedLarge {
+        a: 0,
+        b: OwnedEnum::C(4),
+        c: c1,
+        d: OwnedSimple { a: 0 },
+    };
+    let b = OwnedLarge {
+        a: 0,
+        b: OwnedEnum::B,
+        c: c2,
+        d: OwnedSimple { a: 1 },
+    };
+    let diff = a.diff_owned(b);
+    println!("{diff:#?}");
+
+    // a is unchanged
+    assert_eq!(diff.a.before, diff.a.after);
+    // b changed
+    assert_eq!(diff.b.before, OwnedEnum::C(4));
+    assert_eq!(diff.b.after, OwnedEnum::B);
+    // map diff
+    assert_eq!(diff.c.added.len(), 1);
+    assert!(diff.c.added.contains_key("new"));
+    assert_eq!(diff.c.removed.len(), 0);
+    assert_eq!(diff.c.common.len(), 1);
+    // nested struct diff
+    assert_eq!(diff.d.a.before, 0);
+    assert_eq!(diff.d.a.after, 1);
+}
+
+#[test]
+fn test_owned_outlives_originals() {
+    // The key advantage: the diff outlives the originals.
+    let diff = {
+        let a = OwnedSimple { a: 42 };
+        let b = OwnedSimple { a: 99 };
+        a.diff_owned(b)
+        // a and b are consumed here
+    };
+
+    // diff is fully owned - still valid
+    assert_eq!(diff.a.before, 42);
+    assert_eq!(diff.a.after, 99);
+}
+
+#[test]
+fn test_owned_with_attributes() {
+    #[derive(Debug, Eq, PartialEq, DiffableOwned)]
+    struct Inner {
+        x: usize,
+    }
+
+    #[derive(Debug, Eq, PartialEq)]
+    struct NotDiffable(usize);
+
+    #[derive(Debug, Eq, PartialEq, DiffableOwned)]
+    struct WithAttrs {
+        a: i32,
+        #[daft(ignore)]
+        _b: String,
+        #[daft(leaf)]
+        c: Inner,
+        #[daft(leaf)]
+        d: NotDiffable,
+    }
+
+    let a = WithAttrs {
+        a: 1,
+        _b: "ignored".into(),
+        c: Inner { x: 10 },
+        d: NotDiffable(1),
+    };
+    let b = WithAttrs {
+        a: 2,
+        _b: "also ignored".into(),
+        c: Inner { x: 20 },
+        d: NotDiffable(2),
+    };
+    let diff = a.diff_owned(b);
+
+    assert_eq!(diff.a, Leaf { before: 1, after: 2 });
+    // _b is ignored, not present in diff
+    // c is a leaf (not recursively diffed)
+    assert_eq!(
+        diff.c,
+        Leaf { before: Inner { x: 10 }, after: Inner { x: 20 } }
+    );
+    assert_eq!(
+        diff.d,
+        Leaf { before: NotDiffable(1), after: NotDiffable(2) }
+    );
+}
+
+#[test]
+fn test_owned_primitives() {
+    // Test that primitive types work with DiffableOwned.
+    assert_eq!(42i32.diff_owned(99), Leaf { before: 42, after: 99 });
+    assert_eq!(true.diff_owned(false), Leaf { before: true, after: false });
+    assert_eq!(
+        "hello".to_owned().diff_owned("world".to_owned()),
+        Leaf { before: "hello".to_owned(), after: "world".to_owned() }
+    );
+}
+
+#[test]
+fn test_owned_collections() {
+    // BTreeMap
+    let a: BTreeMap<i32, &str> = [(1, "a"), (2, "b")].into_iter().collect();
+    let b: BTreeMap<i32, &str> = [(2, "B"), (3, "c")].into_iter().collect();
+    let diff = a.diff_owned(b);
+
+    assert_eq!(diff.removed, [(1, "a")].into_iter().collect());
+    assert_eq!(diff.added, [(3, "c")].into_iter().collect());
+    assert_eq!(diff.common.len(), 1);
+    assert_eq!(
+        diff.common[&2],
+        Leaf { before: "b", after: "B" }
+    );
+
+    // BTreeSet
+    let a: BTreeSet<i32> = [1, 2, 3].into_iter().collect();
+    let b: BTreeSet<i32> = [2, 3, 4].into_iter().collect();
+    let diff = a.diff_owned(b);
+
+    assert_eq!(diff.common, [2, 3].into_iter().collect());
+    assert_eq!(diff.added, [4].into_iter().collect());
+    assert_eq!(diff.removed, [1].into_iter().collect());
+}
+
+#[test]
+fn test_owned_tuples() {
+    let diff = (1i32, "hello".to_owned()).diff_owned((2, "world".to_owned()));
+    assert_eq!(diff.0, Leaf { before: 1, after: 2 });
+    assert_eq!(
+        diff.1,
+        Leaf { before: "hello".to_owned(), after: "world".to_owned() }
+    );
+}
+
+#[test]
+fn test_owned_wrapper_types() {
+    // Box
+    let diff = Box::new(42i32).diff_owned(Box::new(99));
+    assert_eq!(diff, Leaf { before: 42, after: 99 });
+
+    // Vec (leaf)
+    let diff = vec![1, 2, 3].diff_owned(vec![4, 5, 6]);
+    assert_eq!(diff, Leaf { before: vec![1, 2, 3], after: vec![4, 5, 6] });
+
+    // Option
+    let diff = Some(1i32).diff_owned(Some(2));
+    assert_eq!(diff, Leaf { before: Some(1), after: Some(2) });
+}
+
+// ---------------------------------------------------------------------------
+// Serde round-trip tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_serde_leaf() {
+    let leaf = Leaf { before: 42i32, after: 99 };
+    let json = serde_json::to_string(&leaf).unwrap();
+    let deserialized: Leaf<i32> = serde_json::from_str(&json).unwrap();
+    assert_eq!(leaf, deserialized);
+}
+
+#[test]
+fn test_serde_owned_map_diff() {
+    let a: BTreeMap<String, i32> =
+        [("x".into(), 1), ("y".into(), 2)].into_iter().collect();
+    let b: BTreeMap<String, i32> =
+        [("y".into(), 3), ("z".into(), 4)].into_iter().collect();
+    let diff = a.diff_owned(b);
+
+    let json = serde_json::to_string(&diff).unwrap();
+    let deserialized: daft::BTreeMapDiffOwned<String, i32> =
+        serde_json::from_str(&json).unwrap();
+    assert_eq!(diff, deserialized);
+}
+
+#[test]
+fn test_serde_owned_set_diff() {
+    let a: BTreeSet<i32> = [1, 2, 3].into_iter().collect();
+    let b: BTreeSet<i32> = [2, 3, 4].into_iter().collect();
+    let diff = a.diff_owned(b);
+
+    let json = serde_json::to_string(&diff).unwrap();
+    let deserialized: daft::BTreeSetDiffOwned<i32> =
+        serde_json::from_str(&json).unwrap();
+    assert_eq!(diff, deserialized);
+}
+
+#[test]
+fn test_serde_leaf_string() {
+    let leaf: Leaf<String> =
+        "hello".to_owned().diff_owned("world".to_owned());
+    let json = serde_json::to_string(&leaf).unwrap();
+    let deserialized: Leaf<String> = serde_json::from_str(&json).unwrap();
+    assert_eq!(leaf, deserialized);
+
+    let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(value["before"], "hello");
+    assert_eq!(value["after"], "world");
 }

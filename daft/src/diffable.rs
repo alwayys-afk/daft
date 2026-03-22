@@ -16,3 +16,18 @@ pub trait Diffable {
     /// Compute the diff between two values.
     fn diff<'daft>(&'daft self, other: &'daft Self) -> Self::Diff<'daft>;
 }
+
+/// Represents a type which can be diffed by consuming both values.
+///
+/// Unlike [`Diffable`], which borrows values and returns a diff tied to
+/// their lifetime, this trait takes ownership of both `self` and `other`,
+/// producing a diff with no lifetime parameter. This is useful when the
+/// diff needs to be serialized, stored, or otherwise outlive the original
+/// values.
+pub trait DiffableOwned: Sized {
+    /// The type of the owned diff. Has no lifetime parameter.
+    type DiffOwned;
+
+    /// Compute the diff between two values, consuming both.
+    fn diff_owned(self, other: Self) -> Self::DiffOwned;
+}

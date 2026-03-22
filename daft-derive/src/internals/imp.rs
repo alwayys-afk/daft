@@ -791,3 +791,428 @@ enum FieldMode {
     // Ignore this field.
     Ignore,
 }
+
+// ---------------------------------------------------------------------------
+// DiffableOwned derive
+// ---------------------------------------------------------------------------
+
+pub fn derive_diffable_owned(input: syn::DeriveInput) -> DeriveDiffableOutput {
+    let mut error_store = ErrorStore::new();
+
+    match &input.data {
+        Data::Enum(_) => {
+            let out =
+                make_leaf_owned(&input, AttrPosition::Enum, error_store.sink());
+            DeriveDiffableOutput {
+                out: Some(out),
+                errors: error_store.into_inner(),
+            }
+        }
+        Data::Struct(s) => {
+            let out =
+                make_struct_impl_owned(&input, s, error_store.sink());
+            DeriveDiffableOutput { out, errors: error_store.into_inner() }
+        }
+        Data::Union(_) => {
+            let out = make_leaf_owned(
+                &input,
+                AttrPosition::Union,
+                error_store.sink(),
+            );
+            DeriveDiffableOutput {
+                out: Some(out),
+                errors: error_store.into_inner(),
+            }
+        }
+    }
+}
+
+/// Implement `DiffableOwned` as a `Leaf<Self>` (owned, consuming).
+fn make_leaf_owned(
+    input: &DeriveInput,
+    position: AttrPosition,
+    errors: ErrorSink<'_, syn::Error>,
+) -> TokenStream {
+    // Validate attributes (same rules as the borrowed version).
+    for attr in &input.attrs {
+        if attr.path().is_ident("daft") {
+            let res = attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("leaf") {
+                    if position == AttrPosition::LeafStruct {
+                        return Ok(());
+                    }
+                    errors.push_critical(meta.error(format!(
+                        "this is unnecessary: the DiffableOwned \
+                         implementation {} is always a leaf",
+                        position.as_purpose_str(),
+                    )));
+                } else {
+                    errors.push_critical(meta.error(format!(
+                        "daft attributes are not allowed {}",
+                        position.as_locative_str(),
+                    )));
+                }
+                Ok(())
+            });
+            if let Err(err) = res {
+                errors.push_critical(err);
+            }
+        }
+    }
+
+    let mut v = BanDaftAttrsVisitor { position, errors: errors.new_child() };
+    v.visit_data(&input.data);
+
+    let ident = &input.ident;
+    let daft_crate = daft_crate();
+    let (impl_gen, ty_gen, where_clause) = &input.generics.split_for_impl();
+
+    quote! {
+        impl #impl_gen #daft_crate::DiffableOwned for #ident #ty_gen #where_clause
+        {
+            type DiffOwned = #daft_crate::Leaf<Self>;
+
+            fn diff_owned(self, other: Self) -> Self::DiffOwned {
+                #daft_crate::Leaf { before: self, after: other }
+            }
+        }
+    }
+}
+
+fn make_struct_impl_owned(
+    input: &DeriveInput,
+    s: &DataStruct,
+    errors: ErrorSink<'_, syn::Error>,
+) -> Option<TokenStream> {
+    let struct_config =
+        StructConfig::parse_from(&input.attrs, errors.new_child())?;
+
+    match struct_config.mode {
+        StructMode::Default => {
+            make_diff_struct_owned(input, s, errors.new_child()).map(
+                |(generated_struct, diff_fields)| {
+                    let diff_impl =
+                        make_diff_impl_owned(input, &diff_fields);
+                    quote! {
+                        #generated_struct
+                        #diff_impl
+                    }
+                },
+            )
+        }
+        StructMode::Leaf => Some(make_leaf_owned(
+            input,
+            AttrPosition::LeafStruct,
+            errors.new_child(),
+        )),
+    }
+}
+
+/// Create the owned `DiffOwned` struct (no lifetime parameter).
+fn make_diff_struct_owned(
+    input: &DeriveInput,
+    s: &DataStruct,
+    errors: ErrorSink<'_, syn::Error>,
+) -> Option<(TokenStream, OwnedDiffFields)> {
+    let vis = &input.vis;
+    let name =
+        parse_str::<Path>(&format!("{}DiffOwned", input.ident)).unwrap();
+
+    let non_exhaustive =
+        input.attrs.iter().find(|attr| attr.path().is_ident("non_exhaustive"));
+
+    // For owned diffs, we use the original generics (no added lifetime).
+    let where_clause = input.generics.where_clause.as_ref();
+
+    let diff_fields = OwnedDiffFields::new(
+        &s.fields,
+        where_clause,
+        errors.new_child(),
+    )?;
+
+    // --- No more errors past this point ---
+
+    let generics = &input.generics;
+    let struct_def = match &s.fields {
+        Fields::Named(_) => quote! {
+            #non_exhaustive
+            #vis struct #name #generics #where_clause #diff_fields
+        },
+        Fields::Unnamed(_) => quote! {
+            #non_exhaustive
+            #vis struct #name #generics #diff_fields #where_clause;
+        },
+        Fields::Unit => quote! {
+            #non_exhaustive
+            #vis struct #name #generics {} #where_clause
+        },
+    };
+
+    let (impl_gen, ty_gen, _) = &input.generics.split_for_impl();
+
+    let debug_impl = {
+        let where_clause = diff_fields.where_clause_with_trait_bound(
+            &parse_quote! { ::core::fmt::Debug },
+        );
+        let members = diff_fields.fields.members();
+
+        let finish = if non_exhaustive.is_some() {
+            quote! { .finish_non_exhaustive() }
+        } else {
+            quote! { .finish() }
+        };
+
+        let debug_body = match &s.fields {
+            Fields::Named(_) => {
+                quote! {
+                    f.debug_struct(stringify!(#name))
+                    #(
+                        .field(stringify!(#members), &self.#members)
+                    )*
+                    #finish
+                }
+            }
+            Fields::Unnamed(_) => quote! {
+                f.debug_tuple(stringify!(#name))
+                #(
+                    .field(&self.#members)
+                )*
+                #finish
+            },
+            Fields::Unit => quote! {
+                f.debug_struct(stringify!(#name))
+                    #finish
+            },
+        };
+        quote! {
+            impl #impl_gen ::core::fmt::Debug for #name #ty_gen #where_clause {
+                fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                    #debug_body
+                }
+            }
+        }
+    };
+
+    let partial_eq_impl = {
+        let where_clause = diff_fields.where_clause_with_trait_bound(
+            &parse_quote! { ::core::cmp::PartialEq },
+        );
+        let members = diff_fields.fields.members();
+
+        let partial_eq_body: Expr = parse_quote! {
+            #(self.#members == other.#members) && *
+        };
+
+        quote! {
+            impl #impl_gen ::core::cmp::PartialEq for #name #ty_gen #where_clause {
+                fn eq(&self, other: &Self) -> bool {
+                    #partial_eq_body
+                }
+            }
+        }
+    };
+
+    let eq_impl = {
+        let where_clause = diff_fields
+            .where_clause_with_trait_bound(&parse_quote! { ::core::cmp::Eq });
+
+        quote! {
+            impl #impl_gen ::core::cmp::Eq for #name #ty_gen #where_clause {}
+        }
+    };
+
+    Some((
+        quote! {
+            #struct_def
+            #debug_impl
+            #partial_eq_impl
+            #eq_impl
+        },
+        diff_fields,
+    ))
+}
+
+/// Impl `DiffableOwned` for the original struct.
+fn make_diff_impl_owned(
+    input: &DeriveInput,
+    diff_fields: &OwnedDiffFields,
+) -> TokenStream {
+    let ident = &input.ident;
+    let name =
+        parse_str::<Path>(&format!("{}DiffOwned", input.ident)).unwrap();
+    let diffs = generate_field_diffs_owned(
+        &diff_fields.fields,
+        &diff_fields.field_configs,
+    );
+
+    let daft_crate = daft_crate();
+    let (impl_gen, ty_gen, where_clause) = &input.generics.split_for_impl();
+
+    quote! {
+        impl #impl_gen #daft_crate::DiffableOwned for #ident #ty_gen
+            #where_clause
+        {
+            type DiffOwned = #name #ty_gen;
+
+            fn diff_owned(self, other: Self) -> #name #ty_gen {
+                Self::DiffOwned {
+                    #diffs
+                }
+            }
+        }
+    }
+}
+
+/// Tracks fields for the owned diff struct.
+struct OwnedDiffFields {
+    fields: Fields,
+    field_configs: Vec<FieldConfig>,
+    where_clause: WhereClause,
+}
+
+impl OwnedDiffFields {
+    fn new(
+        fields: &Fields,
+        where_clause: Option<&WhereClause>,
+        errors: ErrorSink<'_, syn::Error>,
+    ) -> Option<Self> {
+        let (fields, field_configs) = match fields {
+            Fields::Named(fields) => {
+                let (named, configs) = fields
+                    .named
+                    .iter()
+                    .filter_map(|field| {
+                        Self::diff_field(field, errors.new_child())
+                    })
+                    .unzip();
+                (
+                    Fields::Named(syn::FieldsNamed {
+                        brace_token: fields.brace_token,
+                        named,
+                    }),
+                    configs,
+                )
+            }
+            Fields::Unnamed(fields) => {
+                let (unnamed, configs) = fields
+                    .unnamed
+                    .iter()
+                    .filter_map(|field| {
+                        Self::diff_field(field, errors.new_child())
+                    })
+                    .unzip();
+                (
+                    Fields::Unnamed(syn::FieldsUnnamed {
+                        paren_token: fields.paren_token,
+                        unnamed,
+                    }),
+                    configs,
+                )
+            }
+            Fields::Unit => (Fields::Unit, Vec::new()),
+        };
+
+        let where_clause =
+            where_clause.cloned().unwrap_or_else(|| WhereClause {
+                where_token: <Token![where]>::default(),
+                predicates: Default::default(),
+            });
+
+        if errors.has_critical_errors() {
+            None
+        } else {
+            Some(Self { fields, field_configs, where_clause })
+        }
+    }
+
+    /// Return a field for an owned diff with the appropriate type.
+    fn diff_field(
+        f: &Field,
+        errors: ErrorSink<'_, syn::Error>,
+    ) -> Option<(Field, FieldConfig)> {
+        let config =
+            FieldConfig::parse_from(&f.attrs, errors.new_child())?;
+        if config.mode == FieldMode::Ignore {
+            return None;
+        }
+
+        let daft_crate = daft_crate();
+        let ty = &f.ty;
+        let mut f = f.clone();
+
+        // For owned diffs: Leaf<FieldType> or <FieldType as DiffableOwned>::DiffOwned
+        f.ty = if config.mode == FieldMode::Leaf {
+            parse_quote_spanned! {f.span()=>
+                #daft_crate::Leaf<#ty>
+            }
+        } else {
+            parse_quote_spanned! {f.span()=>
+                <#ty as #daft_crate::DiffableOwned>::DiffOwned
+            }
+        };
+
+        f.attrs = vec![];
+
+        Some((f, config))
+    }
+
+    fn types(&self) -> impl Iterator<Item = &syn::Type> {
+        self.fields.iter().map(|f| &f.ty)
+    }
+
+    fn where_clause_with_trait_bound(
+        &self,
+        trait_bound: &syn::TraitBound,
+    ) -> WhereClause {
+        let predicates = self.types().map(|ty| -> WherePredicate {
+            parse_quote_spanned! {ty.span()=>
+                #ty: #trait_bound
+            }
+        });
+
+        let mut where_clause = self.where_clause.clone();
+        where_clause.predicates.extend(predicates);
+
+        where_clause
+    }
+}
+
+impl ToTokens for OwnedDiffFields {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.fields.to_tokens(tokens);
+    }
+}
+
+/// Generate moves for each field of the original struct (owned version).
+fn generate_field_diffs_owned(
+    fields: &Fields,
+    field_configs: &[FieldConfig],
+) -> TokenStream {
+    let daft_crate = daft_crate();
+    let field_diffs =
+        fields.iter().zip(field_configs).enumerate().map(|(i, (f, config))| {
+            let field_name = match &f.ident {
+                Some(ident) => quote! { #ident },
+                None => {
+                    let ident: Index = i.into();
+                    quote! { #ident }
+                }
+            };
+            if config.mode == FieldMode::Leaf {
+                quote_spanned! {f.span()=>
+                    #field_name: #daft_crate::Leaf {
+                        before: self.#field_name,
+                        after: other.#field_name
+                    }
+                }
+            } else {
+                quote_spanned! {f.span()=>
+                    #field_name: #daft_crate::DiffableOwned::diff_owned(
+                        self.#field_name,
+                        other.#field_name
+                    )
+                }
+            }
+        });
+    quote! { #(#field_diffs),* }
+}
