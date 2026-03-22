@@ -231,16 +231,20 @@ fn test_owned_basic() {
     let diff = OwnedEnum::A.diff_owned(OwnedEnum::B);
     assert_eq!(diff, Leaf { before: OwnedEnum::A, after: OwnedEnum::B });
 
-    // Struct: produces recursive owned diff
+    // Struct: sparse — changed fields are Some, unchanged are None
     let diff = OwnedSimple { a: 0 }.diff_owned(OwnedSimple { a: 1 });
-    assert_eq!(diff, OwnedSimpleDiffOwned { a: Leaf { before: 0, after: 1 } });
+    assert_eq!(diff, OwnedSimpleDiffOwned { a: Some(Leaf { before: 0, after: 1 }) });
+
+    // Unchanged fields are None
+    let diff = OwnedSimple { a: 5 }.diff_owned(OwnedSimple { a: 5 });
+    assert_eq!(diff, OwnedSimpleDiffOwned { a: None });
 
     // Tuple struct
     let diff = OwnedTupleStruct("hello".into())
         .diff_owned(OwnedTupleStruct("world".into()));
     assert_eq!(
         diff.0,
-        Leaf { before: "hello".to_owned(), after: "world".to_owned() }
+        Some(Leaf { before: "hello".to_owned(), after: "world".to_owned() })
     );
 }
 
@@ -270,19 +274,22 @@ fn test_owned_complex() {
     let diff = a.diff_owned(b);
     println!("{diff:#?}");
 
-    // a is unchanged
-    assert_eq!(diff.a.before, diff.a.after);
+    // a is unchanged — None
+    assert!(diff.a.is_none());
     // b changed
-    assert_eq!(diff.b.before, OwnedEnum::C(4));
-    assert_eq!(diff.b.after, OwnedEnum::B);
+    let b_diff = diff.b.unwrap();
+    assert_eq!(b_diff.before, OwnedEnum::C(4));
+    assert_eq!(b_diff.after, OwnedEnum::B);
     // map diff
-    assert_eq!(diff.c.added.len(), 1);
-    assert!(diff.c.added.contains_key("new"));
-    assert_eq!(diff.c.removed.len(), 0);
-    assert_eq!(diff.c.common.len(), 1);
+    let c_diff = diff.c.unwrap();
+    assert_eq!(c_diff.added.len(), 1);
+    assert!(c_diff.added.contains_key("new"));
+    assert_eq!(c_diff.removed.len(), 0);
+    assert_eq!(c_diff.common.len(), 1);
     // nested struct diff
-    assert_eq!(diff.d.a.before, 0);
-    assert_eq!(diff.d.a.after, 1);
+    let d_diff = diff.d.unwrap();
+    assert_eq!(d_diff.a.unwrap().before, 0);
+    assert_eq!(d_diff.a.unwrap().after, 1);
 }
 
 #[test]
@@ -296,8 +303,9 @@ fn test_owned_outlives_originals() {
     };
 
     // diff is fully owned - still valid
-    assert_eq!(diff.a.before, 42);
-    assert_eq!(diff.a.after, 99);
+    let a_diff = diff.a.unwrap();
+    assert_eq!(a_diff.before, 42);
+    assert_eq!(a_diff.after, 99);
 }
 
 #[test]
@@ -335,16 +343,16 @@ fn test_owned_with_attributes() {
     };
     let diff = a.diff_owned(b);
 
-    assert_eq!(diff.a, Leaf { before: 1, after: 2 });
+    assert_eq!(diff.a, Some(Leaf { before: 1, after: 2 }));
     // _b is ignored, not present in diff
     // c is a leaf (not recursively diffed)
     assert_eq!(
         diff.c,
-        Leaf { before: Inner { x: 10 }, after: Inner { x: 20 } }
+        Some(Leaf { before: Inner { x: 10 }, after: Inner { x: 20 } })
     );
     assert_eq!(
         diff.d,
-        Leaf { before: NotDiffable(1), after: NotDiffable(2) }
+        Some(Leaf { before: NotDiffable(1), after: NotDiffable(2) })
     );
 }
 

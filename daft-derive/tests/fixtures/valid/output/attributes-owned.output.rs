@@ -1,20 +1,24 @@
 struct WithAttrsOwnedDiffOwned {
-    a: <i32 as ::daft::DiffableOwned>::DiffOwned,
-    b: <BTreeMap<Uuid, BTreeSet<usize>> as ::daft::DiffableOwned>::DiffOwned,
-    d: ::daft::Leaf<Lazy>,
-    e: ::daft::Leaf<usize>,
-    f: <usize as ::daft::DiffableOwned>::DiffOwned,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    a: Option<<i32 as ::daft::DiffableOwned>::DiffOwned>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    b: Option<<BTreeMap<Uuid, BTreeSet<usize>> as ::daft::DiffableOwned>::DiffOwned>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    d: Option<::daft::Leaf<Lazy>>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    e: Option<::daft::Leaf<usize>>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    f: Option<<usize as ::daft::DiffableOwned>::DiffOwned>,
 }
 impl ::core::fmt::Debug for WithAttrsOwnedDiffOwned
 where
-    <i32 as ::daft::DiffableOwned>::DiffOwned: ::core::fmt::Debug,
-    <BTreeMap<
-        Uuid,
-        BTreeSet<usize>,
-    > as ::daft::DiffableOwned>::DiffOwned: ::core::fmt::Debug,
-    ::daft::Leaf<Lazy>: ::core::fmt::Debug,
-    ::daft::Leaf<usize>: ::core::fmt::Debug,
-    <usize as ::daft::DiffableOwned>::DiffOwned: ::core::fmt::Debug,
+    Option<<i32 as ::daft::DiffableOwned>::DiffOwned>: ::core::fmt::Debug,
+    Option<
+        <BTreeMap<Uuid, BTreeSet<usize>> as ::daft::DiffableOwned>::DiffOwned,
+    >: ::core::fmt::Debug,
+    Option<::daft::Leaf<Lazy>>: ::core::fmt::Debug,
+    Option<::daft::Leaf<usize>>: ::core::fmt::Debug,
+    Option<<usize as ::daft::DiffableOwned>::DiffOwned>: ::core::fmt::Debug,
 {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct(stringify!(WithAttrsOwnedDiffOwned))
@@ -28,14 +32,13 @@ where
 }
 impl ::core::cmp::PartialEq for WithAttrsOwnedDiffOwned
 where
-    <i32 as ::daft::DiffableOwned>::DiffOwned: ::core::cmp::PartialEq,
-    <BTreeMap<
-        Uuid,
-        BTreeSet<usize>,
-    > as ::daft::DiffableOwned>::DiffOwned: ::core::cmp::PartialEq,
-    ::daft::Leaf<Lazy>: ::core::cmp::PartialEq,
-    ::daft::Leaf<usize>: ::core::cmp::PartialEq,
-    <usize as ::daft::DiffableOwned>::DiffOwned: ::core::cmp::PartialEq,
+    Option<<i32 as ::daft::DiffableOwned>::DiffOwned>: ::core::cmp::PartialEq,
+    Option<
+        <BTreeMap<Uuid, BTreeSet<usize>> as ::daft::DiffableOwned>::DiffOwned,
+    >: ::core::cmp::PartialEq,
+    Option<::daft::Leaf<Lazy>>: ::core::cmp::PartialEq,
+    Option<::daft::Leaf<usize>>: ::core::cmp::PartialEq,
+    Option<<usize as ::daft::DiffableOwned>::DiffOwned>: ::core::cmp::PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         self.a == other.a && self.b == other.b && self.d == other.d && self.e == other.e
@@ -44,41 +47,62 @@ where
 }
 impl ::core::cmp::Eq for WithAttrsOwnedDiffOwned
 where
-    <i32 as ::daft::DiffableOwned>::DiffOwned: ::core::cmp::Eq,
-    <BTreeMap<
-        Uuid,
-        BTreeSet<usize>,
-    > as ::daft::DiffableOwned>::DiffOwned: ::core::cmp::Eq,
-    ::daft::Leaf<Lazy>: ::core::cmp::Eq,
-    ::daft::Leaf<usize>: ::core::cmp::Eq,
-    <usize as ::daft::DiffableOwned>::DiffOwned: ::core::cmp::Eq,
+    Option<<i32 as ::daft::DiffableOwned>::DiffOwned>: ::core::cmp::Eq,
+    Option<
+        <BTreeMap<Uuid, BTreeSet<usize>> as ::daft::DiffableOwned>::DiffOwned,
+    >: ::core::cmp::Eq,
+    Option<::daft::Leaf<Lazy>>: ::core::cmp::Eq,
+    Option<::daft::Leaf<usize>>: ::core::cmp::Eq,
+    Option<<usize as ::daft::DiffableOwned>::DiffOwned>: ::core::cmp::Eq,
 {}
 impl ::daft::DiffableOwned for WithAttrsOwned {
     type DiffOwned = WithAttrsOwnedDiffOwned;
     fn diff_owned(self, other: Self) -> WithAttrsOwnedDiffOwned {
         Self::DiffOwned {
-            a: ::daft::DiffableOwned::diff_owned(self.a, other.a),
-            b: ::daft::DiffableOwned::diff_owned(self.b, other.b),
-            d: ::daft::Leaf {
-                before: self.d,
-                after: other.d,
+            a: if self.a == other.a {
+                None
+            } else {
+                Some(::daft::DiffableOwned::diff_owned(self.a, other.a))
             },
-            e: ::daft::Leaf {
-                before: self.e,
-                after: other.e,
+            b: if self.b == other.b {
+                None
+            } else {
+                Some(::daft::DiffableOwned::diff_owned(self.b, other.b))
             },
-            f: ::daft::DiffableOwned::diff_owned(self.f, other.f),
+            d: if self.d == other.d {
+                None
+            } else {
+                Some(::daft::Leaf {
+                    before: self.d,
+                    after: other.d,
+                })
+            },
+            e: if self.e == other.e {
+                None
+            } else {
+                Some(::daft::Leaf {
+                    before: self.e,
+                    after: other.e,
+                })
+            },
+            f: if self.f == other.f {
+                None
+            } else {
+                Some(::daft::DiffableOwned::diff_owned(self.f, other.f))
+            },
         }
     }
 }
 struct LazyDiffOwned {
-    x: <usize as ::daft::DiffableOwned>::DiffOwned,
-    y: <usize as ::daft::DiffableOwned>::DiffOwned,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    x: Option<<usize as ::daft::DiffableOwned>::DiffOwned>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    y: Option<<usize as ::daft::DiffableOwned>::DiffOwned>,
 }
 impl ::core::fmt::Debug for LazyDiffOwned
 where
-    <usize as ::daft::DiffableOwned>::DiffOwned: ::core::fmt::Debug,
-    <usize as ::daft::DiffableOwned>::DiffOwned: ::core::fmt::Debug,
+    Option<<usize as ::daft::DiffableOwned>::DiffOwned>: ::core::fmt::Debug,
+    Option<<usize as ::daft::DiffableOwned>::DiffOwned>: ::core::fmt::Debug,
 {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct(stringify!(LazyDiffOwned))
@@ -89,8 +113,8 @@ where
 }
 impl ::core::cmp::PartialEq for LazyDiffOwned
 where
-    <usize as ::daft::DiffableOwned>::DiffOwned: ::core::cmp::PartialEq,
-    <usize as ::daft::DiffableOwned>::DiffOwned: ::core::cmp::PartialEq,
+    Option<<usize as ::daft::DiffableOwned>::DiffOwned>: ::core::cmp::PartialEq,
+    Option<<usize as ::daft::DiffableOwned>::DiffOwned>: ::core::cmp::PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         self.x == other.x && self.y == other.y
@@ -98,15 +122,23 @@ where
 }
 impl ::core::cmp::Eq for LazyDiffOwned
 where
-    <usize as ::daft::DiffableOwned>::DiffOwned: ::core::cmp::Eq,
-    <usize as ::daft::DiffableOwned>::DiffOwned: ::core::cmp::Eq,
+    Option<<usize as ::daft::DiffableOwned>::DiffOwned>: ::core::cmp::Eq,
+    Option<<usize as ::daft::DiffableOwned>::DiffOwned>: ::core::cmp::Eq,
 {}
 impl ::daft::DiffableOwned for Lazy {
     type DiffOwned = LazyDiffOwned;
     fn diff_owned(self, other: Self) -> LazyDiffOwned {
         Self::DiffOwned {
-            x: ::daft::DiffableOwned::diff_owned(self.x, other.x),
-            y: ::daft::DiffableOwned::diff_owned(self.y, other.y),
+            x: if self.x == other.x {
+                None
+            } else {
+                Some(::daft::DiffableOwned::diff_owned(self.x, other.x))
+            },
+            y: if self.y == other.y {
+                None
+            } else {
+                Some(::daft::DiffableOwned::diff_owned(self.y, other.y))
+            },
         }
     }
 }

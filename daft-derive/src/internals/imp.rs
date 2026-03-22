@@ -1140,18 +1140,21 @@ impl OwnedDiffFields {
         let ty = &f.ty;
         let mut f = f.clone();
 
-        // For owned diffs: Leaf<FieldType> or <FieldType as DiffableOwned>::DiffOwned
+        // Sparse owned diffs: each field is Option<...>, None when unchanged.
         f.ty = if config.mode == FieldMode::Leaf {
             parse_quote_spanned! {f.span()=>
-                #daft_crate::Leaf<#ty>
+                Option<#daft_crate::Leaf<#ty>>
             }
         } else {
             parse_quote_spanned! {f.span()=>
-                <#ty as #daft_crate::DiffableOwned>::DiffOwned
+                Option<<#ty as #daft_crate::DiffableOwned>::DiffOwned>
             }
         };
 
-        f.attrs = vec![];
+        // Skip serializing unchanged fields (None values).
+        f.attrs = vec![
+            parse_quote! { #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))] },
+        ];
 
         Some((f, config))
     }
@@ -1183,7 +1186,10 @@ impl ToTokens for OwnedDiffFields {
     }
 }
 
-/// Generate moves for each field of the original struct (owned version).
+/// Generate sparse field diffs for the owned version.
+///
+/// Each field produces `None` when unchanged (`PartialEq`), or `Some(diff)`
+/// when the value changed.
 fn generate_field_diffs_owned(
     fields: &Fields,
     field_configs: &[FieldConfig],
@@ -1200,17 +1206,25 @@ fn generate_field_diffs_owned(
             };
             if config.mode == FieldMode::Leaf {
                 quote_spanned! {f.span()=>
-                    #field_name: #daft_crate::Leaf {
-                        before: self.#field_name,
-                        after: other.#field_name
+                    #field_name: if self.#field_name == other.#field_name {
+                        None
+                    } else {
+                        Some(#daft_crate::Leaf {
+                            before: self.#field_name,
+                            after: other.#field_name
+                        })
                     }
                 }
             } else {
                 quote_spanned! {f.span()=>
-                    #field_name: #daft_crate::DiffableOwned::diff_owned(
-                        self.#field_name,
-                        other.#field_name
-                    )
+                    #field_name: if self.#field_name == other.#field_name {
+                        None
+                    } else {
+                        Some(#daft_crate::DiffableOwned::diff_owned(
+                            self.#field_name,
+                            other.#field_name
+                        ))
+                    }
                 }
             }
         });
