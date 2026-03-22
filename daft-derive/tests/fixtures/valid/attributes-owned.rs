@@ -1,11 +1,10 @@
 use daft::DiffableOwned;
 use std::collections::{BTreeMap, BTreeSet};
-use uuid::Uuid;
 
 #[derive(Debug, Eq, PartialEq, DiffableOwned)]
 struct WithAttrsOwned {
     a: i32,
-    b: BTreeMap<Uuid, BTreeSet<usize>>,
+    b: BTreeMap<String, BTreeSet<usize>>,
     #[daft(ignore)]
     c: std::time::Instant,
     #[daft(leaf)]
@@ -15,7 +14,7 @@ struct WithAttrsOwned {
     f: usize,
 }
 
-#[derive(Debug, Eq, PartialEq, DiffableOwned)]
+#[derive(Debug, Eq, PartialEq, DiffableOwned, serde::Serialize, serde::Deserialize)]
 struct Lazy {
     x: usize,
     y: usize,

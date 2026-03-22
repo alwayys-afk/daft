@@ -1,12 +1,13 @@
+#[derive(::daft::__private::serde::Serialize, ::daft::__private::serde::Deserialize)]
 struct BasicOwnedDiffOwned {
     a: Option<<i32 as ::daft::DiffableOwned>::DiffOwned>,
-    b: Option<<BTreeMap<Uuid, BTreeSet<usize>> as ::daft::DiffableOwned>::DiffOwned>,
+    b: Option<<BTreeMap<String, BTreeSet<usize>> as ::daft::DiffableOwned>::DiffOwned>,
 }
 impl ::core::fmt::Debug for BasicOwnedDiffOwned
 where
     Option<<i32 as ::daft::DiffableOwned>::DiffOwned>: ::core::fmt::Debug,
     Option<
-        <BTreeMap<Uuid, BTreeSet<usize>> as ::daft::DiffableOwned>::DiffOwned,
+        <BTreeMap<String, BTreeSet<usize>> as ::daft::DiffableOwned>::DiffOwned,
     >: ::core::fmt::Debug,
 {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
@@ -20,7 +21,7 @@ impl ::core::cmp::PartialEq for BasicOwnedDiffOwned
 where
     Option<<i32 as ::daft::DiffableOwned>::DiffOwned>: ::core::cmp::PartialEq,
     Option<
-        <BTreeMap<Uuid, BTreeSet<usize>> as ::daft::DiffableOwned>::DiffOwned,
+        <BTreeMap<String, BTreeSet<usize>> as ::daft::DiffableOwned>::DiffOwned,
     >: ::core::cmp::PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -31,7 +32,7 @@ impl ::core::cmp::Eq for BasicOwnedDiffOwned
 where
     Option<<i32 as ::daft::DiffableOwned>::DiffOwned>: ::core::cmp::Eq,
     Option<
-        <BTreeMap<Uuid, BTreeSet<usize>> as ::daft::DiffableOwned>::DiffOwned,
+        <BTreeMap<String, BTreeSet<usize>> as ::daft::DiffableOwned>::DiffOwned,
     >: ::core::cmp::Eq,
 {}
 impl ::daft::DiffableOwned for BasicOwned {

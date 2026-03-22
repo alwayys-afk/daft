@@ -1,6 +1,7 @@
+#[derive(::daft::__private::serde::Serialize, ::daft::__private::serde::Deserialize)]
 struct WithAttrsOwnedDiffOwned {
     a: Option<<i32 as ::daft::DiffableOwned>::DiffOwned>,
-    b: Option<<BTreeMap<Uuid, BTreeSet<usize>> as ::daft::DiffableOwned>::DiffOwned>,
+    b: Option<<BTreeMap<String, BTreeSet<usize>> as ::daft::DiffableOwned>::DiffOwned>,
     d: Option<::daft::Leaf<Lazy>>,
     e: Option<::daft::Leaf<usize>>,
     f: Option<<usize as ::daft::DiffableOwned>::DiffOwned>,
@@ -9,7 +10,7 @@ impl ::core::fmt::Debug for WithAttrsOwnedDiffOwned
 where
     Option<<i32 as ::daft::DiffableOwned>::DiffOwned>: ::core::fmt::Debug,
     Option<
-        <BTreeMap<Uuid, BTreeSet<usize>> as ::daft::DiffableOwned>::DiffOwned,
+        <BTreeMap<String, BTreeSet<usize>> as ::daft::DiffableOwned>::DiffOwned,
     >: ::core::fmt::Debug,
     Option<::daft::Leaf<Lazy>>: ::core::fmt::Debug,
     Option<::daft::Leaf<usize>>: ::core::fmt::Debug,
@@ -29,7 +30,7 @@ impl ::core::cmp::PartialEq for WithAttrsOwnedDiffOwned
 where
     Option<<i32 as ::daft::DiffableOwned>::DiffOwned>: ::core::cmp::PartialEq,
     Option<
-        <BTreeMap<Uuid, BTreeSet<usize>> as ::daft::DiffableOwned>::DiffOwned,
+        <BTreeMap<String, BTreeSet<usize>> as ::daft::DiffableOwned>::DiffOwned,
     >: ::core::cmp::PartialEq,
     Option<::daft::Leaf<Lazy>>: ::core::cmp::PartialEq,
     Option<::daft::Leaf<usize>>: ::core::cmp::PartialEq,
@@ -44,7 +45,7 @@ impl ::core::cmp::Eq for WithAttrsOwnedDiffOwned
 where
     Option<<i32 as ::daft::DiffableOwned>::DiffOwned>: ::core::cmp::Eq,
     Option<
-        <BTreeMap<Uuid, BTreeSet<usize>> as ::daft::DiffableOwned>::DiffOwned,
+        <BTreeMap<String, BTreeSet<usize>> as ::daft::DiffableOwned>::DiffOwned,
     >: ::core::cmp::Eq,
     Option<::daft::Leaf<Lazy>>: ::core::cmp::Eq,
     Option<::daft::Leaf<usize>>: ::core::cmp::Eq,
@@ -88,6 +89,7 @@ impl ::daft::DiffableOwned for WithAttrsOwned {
         }
     }
 }
+#[derive(::daft::__private::serde::Serialize, ::daft::__private::serde::Deserialize)]
 struct LazyDiffOwned {
     x: Option<<usize as ::daft::DiffableOwned>::DiffOwned>,
     y: Option<<usize as ::daft::DiffableOwned>::DiffOwned>,

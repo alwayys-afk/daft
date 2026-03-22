@@ -202,19 +202,19 @@ fn diff_pair_lifetimes() {
 // DiffableOwned tests
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Eq, PartialEq, DiffableOwned)]
+#[derive(Debug, Clone, Eq, PartialEq, DiffableOwned, serde::Serialize, serde::Deserialize)]
 enum OwnedEnum {
     A,
     B,
     C(u32),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, DiffableOwned)]
+#[derive(Debug, Clone, Eq, PartialEq, DiffableOwned, serde::Serialize, serde::Deserialize)]
 struct OwnedSimple {
     a: i32,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, DiffableOwned)]
+#[derive(Debug, Clone, Eq, PartialEq, DiffableOwned, serde::Serialize, serde::Deserialize)]
 struct OwnedLarge {
     a: i32,
     b: OwnedEnum,
@@ -310,12 +310,12 @@ fn test_owned_outlives_originals() {
 
 #[test]
 fn test_owned_with_attributes() {
-    #[derive(Debug, Eq, PartialEq, DiffableOwned)]
+    #[derive(Debug, Eq, PartialEq, DiffableOwned, serde::Serialize, serde::Deserialize)]
     struct Inner {
         x: usize,
     }
 
-    #[derive(Debug, Eq, PartialEq)]
+    #[derive(Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
     struct NotDiffable(usize);
 
     #[derive(Debug, Eq, PartialEq, DiffableOwned)]

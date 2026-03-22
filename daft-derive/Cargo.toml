@@ -23,6 +23,7 @@ syn = { workspace = true, features = ["full", "visit"] }
 
 [dev-dependencies]
 daft = { workspace = true, features = ["derive", "serde"] }
+serde = { workspace = true }
 serde_json = { workspace = true }
 datatest-stable.workspace = true
 expectorate.workspace = true

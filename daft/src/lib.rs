@@ -505,6 +505,13 @@ mod leaf;
 mod std_impls;
 mod third_party;
 
+/// Private re-exports used by the derive macro. Not part of the public API.
+#[doc(hidden)]
+pub mod __private {
+    #[cfg(feature = "serde")]
+    pub use serde;
+}
+
 #[cfg(feature = "alloc")]
 pub use alloc_impls::*;
 /// Derive macro for the [`Diffable`] trait.
