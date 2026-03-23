@@ -938,17 +938,17 @@ fn make_diff_struct_owned(
     let struct_def = match &s.fields {
         Fields::Named(_) => quote! {
             #non_exhaustive
-            #[derive(#daft_crate_path::__private::serde::Serialize, #daft_crate_path::__private::serde::Deserialize)]
+            #[derive(Default, #daft_crate_path::__private::serde::Serialize, #daft_crate_path::__private::serde::Deserialize)]
             #vis struct #name #generics #where_clause #diff_fields
         },
         Fields::Unnamed(_) => quote! {
             #non_exhaustive
-            #[derive(#daft_crate_path::__private::serde::Serialize, #daft_crate_path::__private::serde::Deserialize)]
+            #[derive(Default, #daft_crate_path::__private::serde::Serialize, #daft_crate_path::__private::serde::Deserialize)]
             #vis struct #name #generics #diff_fields #where_clause;
         },
         Fields::Unit => quote! {
             #non_exhaustive
-            #[derive(#daft_crate_path::__private::serde::Serialize, #daft_crate_path::__private::serde::Deserialize)]
+            #[derive(Default, #daft_crate_path::__private::serde::Serialize, #daft_crate_path::__private::serde::Deserialize)]
             #vis struct #name #generics {} #where_clause
         },
     };
